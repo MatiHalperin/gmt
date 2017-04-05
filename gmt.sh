@@ -16,6 +16,20 @@ function DownloadFinished()
     echo "true"
 }
 
+function GetValueOfProject()
+{
+    PARTS=$(echo "$1" | tr " " "\n")
+    
+    for VALUE in $PARTS
+    do
+        if [[ "$VALUE" == *"$2"* ]]
+        then
+            FOLDER=$(echo "$VALUE" | cut -d '=' -f 2 | cut -d '"' -f 2)
+            echo "$FOLDER"
+        fi
+    done
+}
+
 function gmt()
 {
     if [[ "$1" == "init" ]]; then
@@ -46,8 +60,8 @@ function gmt()
 
             while read -r line || [[ -n $line ]];
             do
-                FOLDER=$(echo "$line" | cut -d'"' -f 4)
-                DESTINATION=$(echo "$line" | cut -d'"' -f 2)
+                FOLDER=$(GetValueOfProject "$line" name)
+                DESTINATION=$(GetValueOfProject "$line" path)
 
                 if ! [ -d "$DESTINATION" ]
                 then
@@ -62,7 +76,7 @@ function gmt()
 
         while read -r line || [[ -n $line ]];
         do
-            FOLDER=$(echo "$line" | cut -d'"' -f 2)
+            FOLDER=$(GetValueOfProject "$line" name)
 
             if ! [ -d "$FOLDER" ];
             then
@@ -76,7 +90,7 @@ function gmt()
 
         while read -r line || [[ -n $line ]];
         do
-            DESTINATION=$(echo "$line" | cut -d'"' -f 2)
+            DESTINATION=$(GetValueOfProject "$line" path)
 
             cd $DESTINATION
             git pull
