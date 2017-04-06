@@ -16,7 +16,7 @@ function DownloadFinished()
     echo "true"
 }
 
-function GetValueOfProject()
+function GetValueOfTag()
 {
     PARTS=$(echo "$1" | tr " " "\n")
     
@@ -58,15 +58,32 @@ function gmt()
                 BRANCH=$(echo "$line" | cut -d';' -f 2)
             done < .gmtconfig-values
 
+            LINE=
+
             while read -r line || [[ -n $line ]];
             do
-                FOLDER=$(GetValueOfProject "$line" name)
-                DESTINATION=$(GetValueOfProject "$line" path)
 
-                if ! [ -d "$DESTINATION" ]
-                then
-                    git clone -b "$BRANCH" "$URL/$FOLDER" "$DESTINATION"
+                if [[ "$line" == *"<"* && "$line" != *"/>"* ]]; then
+
+                    unset $LINE
+                    LINE="$line"
+
+                elif [[ "$line" == *"/>"* ]]; then
+
+                    LINE+=" $line"
+
+                    FOLDER=$(GetValueOfTag "$LINE" name)
+                    DESTINATION=$(GetValueOfTag "$LINE" path)
+
+                    if ! [ -d "$DESTINATION" ]
+                    then
+                        git clone -b "$BRANCH" "$URL/$FOLDER" "$DESTINATION"
+                    fi
+
+                else
+                    LINE+=" $line"
                 fi
+
             done < .gmtconfig-source
         done
 
@@ -76,7 +93,7 @@ function gmt()
 
         while read -r line || [[ -n $line ]];
         do
-            FOLDER=$(GetValueOfProject "$line" name)
+            FOLDER=$(GetValueOfTag "$line" name)
 
             if ! [ -d "$FOLDER" ];
             then
@@ -90,7 +107,7 @@ function gmt()
 
         while read -r line || [[ -n $line ]];
         do
-            DESTINATION=$(GetValueOfProject "$line" path)
+            DESTINATION=$(GetValueOfTag "$line" path)
 
             cd $DESTINATION
             git pull
@@ -112,4 +129,3 @@ function gmt()
         fi
     done
 }
-
