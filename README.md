@@ -1,6 +1,6 @@
 # Git Management Tool (gmt)
 
-A library to clone multiple repos simpler
+A library to clone multiple repos simplerly
 
 ## Getting Started
 
@@ -44,26 +44,10 @@ Now that you have gmt installed, the following commands are available from any t
 
 ### init
 
-You need to specify the URL of the parent page (where all the repos are hosted), the desired branch and the local file with all the repos
+You need to specify the the local file with all the repositories
 
 ```
-$ gmt init [URL] [BRANCH] [FILE]
-```
-
-### change-values
-
-You need to specify the new URL and branch
-
-```
-$ gmt change-values [URL] [BRANCH]
-```
-
-### change-source
-
-You need to specify the new file with the repos
-
-```
-$ gmt change-source [FILE]
+$ gmt init [FILE]
 ```
 
 ### clone

@@ -2,18 +2,18 @@
 
 function DownloadFinished()
 {
-    while read -r line || [[ -n $line ]];
+    while read -r line || [[ -n $line ]]
     do
-        FOLDER=$(echo "$line" | cut -d'"' -f 2)
+        FOLDER=$(echo "$line" | cut -d '"' -f 2)
 
-        if ! [ -d "$FOLDER" ];
+        if ! [ -d "$FOLDER" ]
         then
-            echo "false"
+            echo false
             return
         fi
     done < "$1"
 
-    echo "true"
+    echo true
 }
 
 function GetValueOfTag()
@@ -30,94 +30,129 @@ function GetValueOfTag()
     done
 }
 
+function SimplifyFile()
+{
+    while read -r line || [[ -n $line ]]
+    do
+        if [[ "$line" == *"<"* && "$line" == *"/>"* ]]; then
+
+            SIMPLIFIEDFILE+="$line\n"
+
+        elif [[ "$line" == *"/>"* ]]; then
+
+            SIMPLIFIEDFILE+=" $line\n"
+
+        else
+
+            SIMPLIFIEDFILE+=" $line"
+
+        fi
+    done < "$1"
+
+	while read -r line || [[ -n $line ]]
+	do
+        FILE+="$(echo "$line" | tr -s " ")\n"
+	done < <(echo -e "$SIMPLIFIEDFILE")
+
+	FILE=$(echo -e "$FILE" | sed 's/<!--/\x0<!--/g;s/-->/-->\x0/g' | grep -zv '^<!--' | tr -d '\0' | grep -v "^\s*$")
+
+	echo "$FILE"
+}
+
 function gmt()
 {
     if [[ "$1" == "init" ]]; then
 
-        rm -rf .gmtconfig-values .gmtconfig-source
-        echo "$2;$3" > .gmtconfig-values
-        cp "$4" .gmtconfig-source
+        rm -rf .gmtconfig-remotes .gmtconfig-sources
 
-    elif [[ "$1" == "change-values" ]]; then
+        while read -r line || [[ -n $line ]]
+        do
+            if [[ "$line" == *"<remote"* ]]; then
 
-        rm -rf .gmtconfig-values
-        echo "$2;$3" > .gmtconfig-values
+                echo "$line" >> .gmtconfig-remotes
 
-    elif [[ "$1" == "change-source" ]]; then
+            elif [[ "$line" == *"<project"* ]]; then
 
-        rm -rf .gmtconfig-source
-        cp "$2" .gmtconfig-source
+                echo "$line" >> .gmtconfig-sources
+
+            fi
+        done < <(SimplifyFile "$2")
 
     elif [[ "$1" == "clone" ]]; then
 
-        while [ "$(DownloadFinished .gmtconfig-source)" = "false" ];
+        while [ "$(DownloadFinished .gmtconfig-sources)" == false ]
         do
-            while read -r line || [[ -n $line ]];
+            while read -r project || [[ -n $project ]]
             do
-                URL=$(echo "$line" | cut -d';' -f 1)
-                BRANCH=$(echo "$line" | cut -d';' -f 2)
-            done < .gmtconfig-values
+                while read -r remote || [[ -n $remote ]]
+                do
+                    NAME=$(GetValueOfTag "$remote" name)
 
-            LINE=
-
-            while read -r line || [[ -n $line ]];
-            do
-
-                if [[ "$line" == *"<"* && "$line" != *"/>"* ]]; then
-
-                    unset $LINE
-                    LINE="$line"
-
-                elif [[ "$line" == *"/>"* ]]; then
-
-                    LINE+=" $line"
-
-                    FOLDER=$(GetValueOfTag "$LINE" name)
-                    DESTINATION=$(GetValueOfTag "$LINE" path)
-
-                    if ! [ -d "$DESTINATION" ]
+                    if [[ "$project" == *"$NAME"* ]]
                     then
-                        git clone -b "$BRANCH" "$URL/$FOLDER" "$DESTINATION"
+                        URL=$(GetValueOfTag "$remote" fetch)
+
+                        if [[ "$project" == *"revision="* ]]
+                        then
+                            BRANCH=$(GetValueOfTag "$project" revision)
+                        else
+                            BRANCH=$(GetValueOfTag "$remote" revision | cut -d '/' -f 3)
+                        fi
                     fi
+                done < .gmtconfig-remotes
 
-                else
-                    LINE+=" $line"
+                FOLDER=$(GetValueOfTag "$project" name)
+                DESTINATION=$(GetValueOfTag "$project" path)
+
+                if ! [ -d "$DESTINATION" ]
+                then
+                    git clone -b "$BRANCH" "$URL/$FOLDER" "$DESTINATION"
+                    echo
                 fi
-
-            done < .gmtconfig-source
+            done < .gmtconfig-sources
         done
 
     elif [[ "$1" == "check" ]]; then
 
         echo
 
-        while read -r line || [[ -n $line ]];
+        while read -r line || [[ -n $line ]]
         do
             FOLDER=$(GetValueOfTag "$line" name)
 
-            if ! [ -d "$FOLDER" ];
+            if ! [ -d "$FOLDER" ]
             then
                 echo El repositorio "$FOLDER" no existe
             fi
-        done < .gmtconfig-source
+        done < .gmtconfig-sources
 
         echo
 
     elif [[ "$1" == "sync" ]]; then
 
-        while read -r line || [[ -n $line ]];
+        while read -r line || [[ -n $line ]]
         do
             DESTINATION=$(GetValueOfTag "$line" path)
+            FOLDERS=$(echo "$DESTINATION" | tr "/" "\n")
 
-            cd $DESTINATION
-            git pull
-            cd -
-            echo
-        done < .gmtconfig-source
+            for FOLDER in $FOLDERS
+            do
+                GOBACK+="../"
+            done
+
+            if [ -d "$DESTINATION" ]
+            then
+                echo "$DESTINATION:"
+                cd "$DESTINATION"
+                git pull
+                cd "$GOBACK"
+                echo
+            fi
+        done < .gmtconfig-sources
 
     elif [[ "$1" == "reset" ]]; then
 
-        rm -rf .gmtconfig-source .gmtconfig-values
+        rm -rf .gmtconfig-remotes .gmtconfig-sources
 
     fi
 
