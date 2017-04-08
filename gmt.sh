@@ -4,7 +4,7 @@ function DownloadFinished()
 {
     while read -r line || [[ -n $line ]]
     do
-        FOLDER=$(echo "$line" | cut -d '"' -f 2)
+        FOLDER=$(GetValueOfTag "$line" name)
 
         if ! [ -d "$FOLDER" ]
         then
@@ -106,7 +106,14 @@ function gmt()
 
                 if ! [ -d "$DESTINATION" ]
                 then
-                    git clone -b "$BRANCH" "$URL/$FOLDER" "$DESTINATION"
+                    if [[ "$project" == *"clone-depth="* ]]
+                    then
+                        depth=$(GetValueOfTag "$project" clone-depth)
+                        ARGUMENTS+="--depth $depth"
+                    fi
+
+                    git clone "$URL/$FOLDER" "$DESTINATION" --branch "$BRANCH" "$ARGUMENTS"
+
                     echo
                 fi
             done < .gmtconfig-sources
