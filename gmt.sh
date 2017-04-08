@@ -34,7 +34,7 @@ function SimplifyFile()
 {
     while read -r line || [[ -n $line ]]
     do
-        if [[ "$line" == *"<"* && "$line" == *"/>"* ]]; then
+        if [[ "$line" == *"<"* && "$line" == *"/>"* || "$line" == *"<"* && "$line" == *">"* ]]; then
 
             SIMPLIFIEDFILE+="$line\n"
 
@@ -51,7 +51,7 @@ function SimplifyFile()
 
 	while read -r line || [[ -n $line ]]
 	do
-        FILE+="$(echo "$line" | tr -s " ")\n"
+	    FILE+="$(echo "$line" | tr -s " ")\n"
 	done < <(echo -e "$SIMPLIFIEDFILE")
 
 	FILE=$(echo -e "$FILE" | sed 's/<!--/\x0<!--/g;s/-->/-->\x0/g' | grep -zv '^<!--' | tr -d '\0' | grep -v "^\s*$")
