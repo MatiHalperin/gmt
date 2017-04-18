@@ -49,14 +49,14 @@ function SimplifyFile()
         fi
     done < "$1"
 
-	while read -r line || [[ -n $line ]]
-	do
-	    FILE+="$(echo "$line" | tr -s " ")\n"
-	done < <(echo -e "$SIMPLIFIEDFILE")
+    while read -r line || [[ -n $line ]]
+    do
+        FILE+="$(echo "$line" | tr -s " ")\n"
+    done < <(echo -e "$SIMPLIFIEDFILE")
 
-	FILE=$(echo -e "$FILE" | sed 's/<!--/\x0<!--/g;s/-->/-->\x0/g' | grep -zv '^<!--' | tr -d '\0' | grep -v "^\s*$")
+    FILE=$(echo -e "$FILE" | sed 's/<!--/\x0<!--/g;s/-->/-->\x0/g' | grep -zv '^<!--' | tr -d '\0' | grep -v "^\s*$")
 
-	echo "$FILE"
+    echo "$FILE"
 }
 
 function gmt()
@@ -140,19 +140,13 @@ function gmt()
         while read -r line || [[ -n $line ]]
         do
             DESTINATION=$(GetValueOfTag "$line" path)
-            FOLDERS=$(echo "$DESTINATION" | tr "/" "\n")
-
-            for FOLDER in $FOLDERS
-            do
-                GOBACK+="../"
-            done
 
             if [ -d "$DESTINATION" ]
             then
                 echo "$DESTINATION:"
                 cd "$DESTINATION"
                 git pull
-                cd "$GOBACK"
+                cd - >/dev/null
                 echo
             fi
         done < .gmtconfig-sources
