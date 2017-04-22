@@ -101,7 +101,7 @@ function gmt()
                 then
                     if [ -n "$(GetValueOfTag "$project" clone-depth)" ]
                     then
-                        ARGUMENTS+="--depth 1"
+                        ARGUMENTS+="--depth $(GetValueOfTag "$project" clone-depth)"
                     fi
 
                     if [ -n "$ARGUMENTS" ]
@@ -113,7 +113,7 @@ function gmt()
 
                     if [ -n "$ARGUMENTS" ]
                     then
-                        unset -v "$ARGUMENTS"
+                        unset -v ARGUMENTS
                     fi
 
                     echo
