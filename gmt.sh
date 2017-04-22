@@ -99,13 +99,22 @@ function gmt()
 
                 if ! [ -d "$DESTINATION" ]
                 then
-                    if [[ "$project" == *"clone-depth="* ]]
+                    if [ -n "$(GetValueOfTag "$project" clone-depth)" ]
                     then
-                        depth=$(GetValueOfTag "$project" clone-depth)
-                        ARGUMENTS+="--depth $depth"
+                        ARGUMENTS+="--depth 1"
                     fi
 
-                    git clone "$URL/$FOLDER" "$DESTINATION" --branch "$BRANCH" "$ARGUMENTS"
+                    if [ -n "$ARGUMENTS" ]
+                    then
+                        echo git clone --branch "$BRANCH" "$ARGUMENTS" "$URL/$FOLDER" "$DESTINATION"
+                    else
+                        echo git clone --branch "$BRANCH" "$URL/$FOLDER" "$DESTINATION"
+                    fi
+
+                    if [ -n "$ARGUMENTS" ]
+                    then
+                        unset -v "$ARGUMENTS"
+                    fi
 
                     echo
                 fi
@@ -118,7 +127,7 @@ function gmt()
 
         while read -r line || [[ -n $line ]]
         do
-            FOLDER=$(GetValueOfTag "$line" name)
+            FOLDER=$(GetValueOfTag "$line" path)
 
             if ! [ -d "$FOLDER" ]
             then
