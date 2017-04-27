@@ -106,9 +106,9 @@ function gmt()
 
                     if [ -n "$ARGUMENTS" ]
                     then
-                        echo git clone --branch "$BRANCH" "$ARGUMENTS" "$URL/$FOLDER" "$DESTINATION"
+                        git clone --branch "$BRANCH" "$ARGUMENTS" "$URL/$FOLDER" "$DESTINATION"
                     else
-                        echo git clone --branch "$BRANCH" "$URL/$FOLDER" "$DESTINATION"
+                        git clone --branch "$BRANCH" "$URL/$FOLDER" "$DESTINATION"
                     fi
 
                     if [ -n "$ARGUMENTS" ]
