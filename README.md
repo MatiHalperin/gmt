@@ -27,7 +27,7 @@ $ git clone https://github.com/MatiHalperin/gmt.git
 And add it to the path by opening .bashrc
 
 ```
-$ gedit .bashrc
+$ gedit ~/.bashrc
 ```
 
 And adding at the end of the file
@@ -38,46 +38,64 @@ source [PATH TO THE CLONED REPO]/gmt.sh
 
 Where [PATH TO THE CLONED REPO] is the location of the folder cloned in the first step
 
-## Commands available
+## gmt command reference
 
-Now that you have gmt installed, the following commands are available from any terminal
+gmt usage takes the following form:
+
+```
+gmt <COMMAND> <OPTIONS>
+```
 
 ### init
 
-You need to specify the the local file with all the repositories
+```
+$ gmt init -u <URL> [<OPTIONS>]
+```
+or
+```
+$ gmt init -f <FILE> [<OPTIONS>]
+```
 
-```
-$ gmt init [FILE]
-```
+Installs gmt in the current directory. This creates a .gmt/ directory that contains initialized manifest file.
+
+Options:
+- `-u`: specify a URL from which to retrieve a manifest repository. The common manifest can be found at `https://android.googlesource.com/platform/manifest`
+- `-f`: specify a local file from which to retrieve a manifest repository.
+- `-m`: select a manifest file within the repository. If no manifest name is selected, the default is default.xml.
+- `-b`: specify a revision, i.e., a particular manifest-branch.
 
 ### clone
-
-You don't need to specify anything. It will clone all the repos that aren't cloned already
 
 ```
 $ gmt clone
 ```
+It will download all the projects missing in the current directory.
 
 ### check
-
-It will verify if all the repos are cloned, and tell you the ones that aren't
 
 ```
 $ gmt check
 ```
+It will verify if all the projects are present in the current directory, and print the ones that aren't
 
 ### sync
-
-It will pull all the new commits from the repos and clone the missing ones, if any
 
 ```
 $ gmt sync
 ```
+Downloads new changes and updates the working files in your local environment. It will synchronize the files for all the projects.
+
+When you run `gmt sync`, this is what happens:
+- If the project has already been synchronized once, then `gmt sync` is equivalent to:
+
+    ```
+    $ git pull
+    ```
+After a successful repo sync, the code in specified projects will be up to date with the code in the remote repository.
 
 ### reset
-
-It will delete the config files containing the URL, branch and repos (the file with the repos, not the repos itself)
 
 ```
 $ gmt reset
 ```
+It will delete the .gmt/ directory completely
