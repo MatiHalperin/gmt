@@ -6,7 +6,7 @@ function DownloadFinished()
     do
         if [[ "$line" == *"<project"* ]]
         then
-            FOLDER=$(GetValueOfTag "$line" name)
+            FOLDER=$(GetValueOfTag "$line" path)
 
             if [ ! -d "$FOLDER" ]
             then
@@ -154,7 +154,9 @@ function gmt()
                         ARGUMENTS="--depth $depth"
                     fi
 
-                    eval git clone --branch "$BRANCH" "$ARGUMENTS" "$URL/$FOLDER" "$DESTINATION" | tr -s " "
+                    COMMAND=$(echo git clone --branch "$BRANCH" "$ARGUMENTS" "$URL/$FOLDER" "$DESTINATION" | tr -s " ")
+
+                    eval "$COMMAND"
 
                     if [ -n "$ARGUMENTS" ]
                     then
