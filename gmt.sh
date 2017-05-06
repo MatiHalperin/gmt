@@ -4,14 +4,17 @@ function DownloadFinished()
 {
     while read -r line || [[ -n $line ]]
     do
-        FOLDER=$(GetValueOfTag "$line" name)
-
-        if ! [ -d "$FOLDER" ]
+        if [[ "$line" == *"<project"* ]]
         then
-            echo false
-            return
+            FOLDER=$(GetValueOfTag "$line" name)
+
+            if [ ! -d "$FOLDER" ]
+            then
+                echo false
+                return
+            fi
         fi
-    done < "$1"
+    done < <(SimplifyFile "$1")
 
     echo true
 }
@@ -54,26 +57,71 @@ function SimplifyFile()
 
 function gmt()
 {
-    if [[ "$1" == "init" ]]; then
-
-        rm -rf .gmtconfig-remotes .gmtconfig-sources
-
+    if [ -d .gmt ]
+    then
         while read -r line || [[ -n $line ]]
         do
             if [[ "$line" == *"<remote"* ]]; then
 
-                echo "$line" >> .gmtconfig-remotes
+                remotes+="$line\n"
 
             elif [[ "$line" == *"<project"* ]]; then
 
-                echo "$line" >> .gmtconfig-sources
+                projects+="$line\n"
 
             fi
-        done < <(SimplifyFile "$2")
+        done < <(SimplifyFile .gmt/*.xml)
+    fi
+
+    if [[ "$1" == "init" ]]; then
+
+        rm -rf .gmt/
+
+        if [[ "$2" == "-u" ]]; then
+
+            URL=$3
+
+            for (( i=1; i<=$#; i++ ))
+            do
+                NEXTARGUMENT=$((i+1))
+
+                if [[ "${!i}" == "-b" ]]
+                then
+                    BRANCH=${!NEXTARGUMENT}
+                fi
+
+                if [[ "${!i}" == "-m" ]]
+                then
+                    MANIFEST=${!NEXTARGUMENT}
+                fi
+            done
+
+            if [ -z "$MANIFEST" ]
+            then
+                MANIFEST="default.xml"
+            fi
+
+            if [ -n "$BRANCH" ]
+            then
+                git clone --quiet --branch "$BRANCH" "$URL" .gmt/tmp
+            else
+                git clone --quiet "$URL" .gmt/tmp
+            fi
+
+            cp .gmt/tmp/$MANIFEST .gmt/$MANIFEST
+
+            rm -rf .gmt/tmp
+
+        elif [[ "$2" == "-f" ]]; then
+
+            mkdir .gmt
+            cp "$3" .gmt/
+
+        fi
 
     elif [[ "$1" == "clone" ]]; then
 
-        while [ "$(DownloadFinished .gmtconfig-sources)" == false ]
+        while [ "$(DownloadFinished .gmt/*.xml)" == false ]
         do
             while read -r project || [[ -n $project ]]
             do
@@ -92,24 +140,21 @@ function gmt()
                             BRANCH=$(GetValueOfTag "$remote" revision | cut -d '/' -f 3)
                         fi
                     fi
-                done < .gmtconfig-remotes
+                done <<< "$remotes"
 
                 FOLDER=$(GetValueOfTag "$project" name)
                 DESTINATION=$(GetValueOfTag "$project" path)
 
                 if ! [ -d "$DESTINATION" ]
                 then
-                    if [ -n "$(GetValueOfTag "$project" clone-depth)" ]
+                    depth=$(GetValueOfTag "$project" clone-depth)
+
+                    if [ -n "$depth" ]
                     then
-                        ARGUMENTS+="--depth $(GetValueOfTag "$project" clone-depth)"
+                        ARGUMENTS="--depth $depth"
                     fi
 
-                    if [ -n "$ARGUMENTS" ]
-                    then
-                        git clone --branch "$BRANCH" "$ARGUMENTS" "$URL/$FOLDER" "$DESTINATION"
-                    else
-                        git clone --branch "$BRANCH" "$URL/$FOLDER" "$DESTINATION"
-                    fi
+                    eval git clone --branch "$BRANCH" "$ARGUMENTS" "$URL/$FOLDER" "$DESTINATION" | tr -s " "
 
                     if [ -n "$ARGUMENTS" ]
                     then
@@ -118,44 +163,47 @@ function gmt()
 
                     echo
                 fi
-            done < .gmtconfig-sources
+            done <<< "$projects"
         done
-
-    elif [[ "$1" == "check" ]]; then
-
-        echo
-
-        while read -r line || [[ -n $line ]]
-        do
-            FOLDER=$(GetValueOfTag "$line" path)
-
-            if ! [ -d "$FOLDER" ]
-            then
-                echo El repositorio "$FOLDER" no existe
-            fi
-        done < .gmtconfig-sources
-
-        echo
 
     elif [[ "$1" == "sync" ]]; then
 
-        while read -r line || [[ -n $line ]]
+        while read -r project || [[ -n $project ]]
         do
-            DESTINATION=$(GetValueOfTag "$line" path)
+            while read -r remote || [[ -n $remote ]]
+            do
+                NAME=$(GetValueOfTag "$remote" name)
 
-            if [ -d "$DESTINATION" ]
-            then
-                echo "$DESTINATION:"
-                cd "$DESTINATION"
-                git pull
-                cd - >/dev/null
-                echo
-            fi
-        done < .gmtconfig-sources
+                if [[ "$project" == *"$NAME"* ]]
+                then
+                    DESTINATION=$(GetValueOfTag "$project" path)
+
+                    if [ -d "$DESTINATION" ]
+                    then
+                        echo "$DESTINATION:"
+
+                        if [[ "$remote" == *"refs/tags/"* ]]
+                        then
+                            TAG=$(GetValueOfTag "$remote" revision | cut -d '/' -f 3)
+
+                            if [[ $(git -C "$DESTINATION" describe --tags) != "$TAG" ]]
+                            then
+                                git -C "$DESTINATION" pull
+                                git -C "$DESTINATION" checkout "$TAG"
+                            fi
+                        else
+                            git -C "$DESTINATION" pull
+                        fi
+
+                        echo
+                    fi
+                fi
+            done <<< "$remotes"
+        done <<< "$projects"
 
     elif [[ "$1" == "reset" ]]; then
 
-        rm -rf .gmtconfig-remotes .gmtconfig-sources
+        rm -rf .gmt
 
     fi
 
