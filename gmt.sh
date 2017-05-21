@@ -1,24 +1,5 @@
 #!/bin/bash
 
-function DownloadFinished()
-{
-    while read -r line || [[ -n $line ]]
-    do
-        if [[ "$line" == *"<project"* ]]
-        then
-            FOLDER=$(GetValueOfTag "$line" path)
-
-            if [ ! -d "$FOLDER" ]
-            then
-                echo false
-                return
-            fi
-        fi
-    done < <(SimplifyFile "$1")
-
-    echo true
-}
-
 function GetValueOfTag()
 {
     PARTS=$(echo "$1" | tr " " "\n")
@@ -55,22 +36,98 @@ function SimplifyFile()
     echo -e "$SIMPLIFIEDFILE" | tr -s " " | sed 's/<!--/\x0<!--/g;s/-->/-->\x0/g' | grep -zv '^<!--' | tr -d '\0' | grep -v "^\s*$"
 }
 
+function clone_project()
+{
+    PROJECT=$1
+    REMOTE=$2
+
+    URL=$(GetValueOfTag "$REMOTE" fetch)
+
+    REPOSITORY=$(GetValueOfTag "$PROJECT" name)
+    DESTINATION=$(GetValueOfTag "$PROJECT" path)
+
+    if [[ "$PROJECT" == *"revision="* ]]
+    then
+        BRANCH=$(GetValueOfTag "$PROJECT" revision)
+    else
+        BRANCH=$(GetValueOfTag "$REMOTE" revision | cut -d '/' -f 3)
+    fi
+
+    DEPTH=$(GetValueOfTag "$PROJECT" clone-depth)
+
+    if [ -n "$DEPTH" ]
+    then
+        ARGUMENTS+="--depth $DEPTH"
+    fi
+
+    COMMAND=$(echo git clone --branch "$BRANCH" "$ARGUMENTS" "$URL/$REPOSITORY" "$DESTINATION" | tr -s " ")
+
+    while [ ! -d "$DESTINATION" ]
+    do
+        eval "$COMMAND"
+    done
+
+    if [ -n "$ARGUMENTS" ]
+    then
+        unset -v ARGUMENTS
+    fi
+}
+
+function check_project()
+{
+    FOLDER=$(GetValueOfTag "$1" path)
+
+    if [ ! -d "$FOLDER" ]
+    then
+        echo El repositorio "$FOLDER" no existe
+    fi
+}
+
+function sync_project()
+{
+    FOLDER=$(GetValueOfTag "$1" path)
+
+    if [ -d "$DESTINATION" ]
+    then
+        echo "$DESTINATION:"
+
+        if [[ "$2" == *"refs/tags/"* ]]
+        then
+            TAG=$(GetValueOfTag "$2" revision | cut -d '/' -f 3)
+
+            if [[ $(git -C "$DESTINATION" describe --tags) != "$TAG" ]]
+            then
+                git -C "$DESTINATION" pull
+                git -C "$DESTINATION" checkout "$TAG"
+            fi
+        else
+            git -C "$DESTINATION" pull
+        fi
+    else
+        clone_project "$1"
+    fi
+}
+
 function gmt()
 {
     if [ -d .gmt ]
     then
+        rm -rf .gmt/remotes .gmt/projects
+
+        FILE=$(cat .gmt/main_file)
+
         while read -r line || [[ -n $line ]]
         do
             if [[ "$line" == *"<remote"* ]]; then
 
-                remotes+="$line\n"
+                echo "$line" >> .gmt/remotes
 
             elif [[ "$line" == *"<project"* ]]; then
 
-                projects+="$line\n"
+                echo "$line" >> .gmt/projects
 
             fi
-        done < <(SimplifyFile .gmt/*.xml)
+        done < <(SimplifyFile ".gmt/$FILE")
     fi
 
     if [[ "$1" == "init" ]]; then
@@ -112,63 +169,17 @@ function gmt()
 
             rm -rf .gmt/tmp
 
+            echo "$MANIFEST" > .gmt/main_file
+
         elif [[ "$2" == "-f" ]]; then
 
             mkdir .gmt
             cp "$3" .gmt/
+            echo "$3" > .gmt/main_file
 
         fi
 
     elif [[ "$1" == "clone" ]]; then
-
-        while [ "$(DownloadFinished .gmt/*.xml)" == false ]
-        do
-            while read -r project || [[ -n $project ]]
-            do
-                while read -r remote || [[ -n $remote ]]
-                do
-                    NAME=$(GetValueOfTag "$remote" name)
-
-                    if [[ "$project" == *"$NAME"* ]]
-                    then
-                        URL=$(GetValueOfTag "$remote" fetch)
-
-                        if [[ "$project" == *"revision="* ]]
-                        then
-                            BRANCH=$(GetValueOfTag "$project" revision)
-                        else
-                            BRANCH=$(GetValueOfTag "$remote" revision | cut -d '/' -f 3)
-                        fi
-                    fi
-                done <<< "$remotes"
-
-                FOLDER=$(GetValueOfTag "$project" name)
-                DESTINATION=$(GetValueOfTag "$project" path)
-
-                if ! [ -d "$DESTINATION" ]
-                then
-                    depth=$(GetValueOfTag "$project" clone-depth)
-
-                    if [ -n "$depth" ]
-                    then
-                        ARGUMENTS="--depth $depth"
-                    fi
-
-                    COMMAND=$(echo git clone --branch "$BRANCH" "$ARGUMENTS" "$URL/$FOLDER" "$DESTINATION" | tr -s " ")
-
-                    eval "$COMMAND"
-
-                    if [ -n "$ARGUMENTS" ]
-                    then
-                        unset -v ARGUMENTS
-                    fi
-
-                    echo
-                fi
-            done <<< "$projects"
-        done
-
-    elif [[ "$1" == "sync" ]]; then
 
         while read -r project || [[ -n $project ]]
         do
@@ -178,34 +189,43 @@ function gmt()
 
                 if [[ "$project" == *"$NAME"* ]]
                 then
-                    DESTINATION=$(GetValueOfTag "$project" path)
-
-                    if [ -d "$DESTINATION" ]
-                    then
-                        echo "$DESTINATION:"
-
-                        if [[ "$remote" == *"refs/tags/"* ]]
-                        then
-                            TAG=$(GetValueOfTag "$remote" revision | cut -d '/' -f 3)
-
-                            if [[ $(git -C "$DESTINATION" describe --tags) != "$TAG" ]]
-                            then
-                                git -C "$DESTINATION" pull
-                                git -C "$DESTINATION" checkout "$TAG"
-                            fi
-                        else
-                            git -C "$DESTINATION" pull
-                        fi
-
-                        echo
-                    fi
+                    clone_project "$project" "$remote"
+                    break
                 fi
-            done <<< "$remotes"
-        done <<< "$projects"
+            done < .gmt/remotes
+        done < .gmt/projects
+
+    elif [[ "$1" == "check" ]]; then
+
+        echo
+
+        while read -r project || [[ -n $project ]]
+        do
+            check_project "$project"
+            echo
+        done < .gmt/projects
+
+    elif [[ "$1" == "sync" ]]; then
+
+        echo
+
+        while read -r project || [[ -n $project ]]
+        do
+            while read -r remote || [[ -n $remote ]]
+            do
+                NAME=$(GetValueOfTag "$remote" name)
+
+                if [[ "$project" == *"$NAME"* ]]
+                then
+                    sync_project "$project" "$remote"
+                    echo
+                fi
+            done < .gmt/remotes
+        done < .gmt/projects
 
     elif [[ "$1" == "reset" ]]; then
 
-        rm -rf .gmt
+        rm -rf .gmt/
 
     fi
 
