@@ -179,7 +179,7 @@ function gmt()
 
         fi
 
-    elif [[ "$1" == "clone" ]]; then
+    elif [[ "$1" == "clone" || "$1" == "sync" ]]; then
 
         while read -r project || [[ -n $project ]]
         do
@@ -187,10 +187,16 @@ function gmt()
             do
                 NAME=$(GetValueOfTag "$remote" name)
 
-                if [[ "$project" == *"$NAME"* ]]
+                if [[ "$project" == *"remote=\"$NAME\""* ]]
                 then
-                    clone_project "$project" "$remote"
-                    break
+                    if [[ "$1" == "clone" ]]
+                    then
+                        clone_project "$project" "$remote"
+                    else
+                        sync_project "$project" "$remote"
+                    fi
+
+                    echo
                 fi
             done < .gmt/remotes
         done < .gmt/projects
@@ -203,24 +209,6 @@ function gmt()
         do
             check_project "$project"
             echo
-        done < .gmt/projects
-
-    elif [[ "$1" == "sync" ]]; then
-
-        echo
-
-        while read -r project || [[ -n $project ]]
-        do
-            while read -r remote || [[ -n $remote ]]
-            do
-                NAME=$(GetValueOfTag "$remote" name)
-
-                if [[ "$project" == *"$NAME"* ]]
-                then
-                    sync_project "$project" "$remote"
-                    echo
-                fi
-            done < .gmt/remotes
         done < .gmt/projects
 
     elif [[ "$1" == "reset" ]]; then
