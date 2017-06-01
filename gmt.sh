@@ -85,15 +85,18 @@ function check_project()
 
 function sync_project()
 {
-    FOLDER=$(GetValueOfTag "$1" path)
+    PROJECT=$1
+    REMOTE=$2
+
+    FOLDER=$(GetValueOfTag "$PROJECT" path)
 
     if [ -d "$DESTINATION" ]
     then
         echo "$DESTINATION:"
 
-        if [[ "$2" == *"refs/tags/"* ]]
+        if [[ "$REMOTE" == *"revision=\"refs/tags/"* ]]
         then
-            TAG=$(GetValueOfTag "$2" revision | cut -d '/' -f 3)
+            TAG=$(GetValueOfTag "$REMOTE" revision | cut -d '/' -f 3)
 
             if [[ $(git -C "$DESTINATION" describe --tags) != "$TAG" ]]
             then
@@ -101,7 +104,17 @@ function sync_project()
                 git -C "$DESTINATION" checkout "$TAG"
             fi
         else
-            git -C "$DESTINATION" pull
+            URL=$(GetValueOfTag "$REMOTE" fetch)
+            REPOSITORY=$(GetValueOfTag "$PROJECT" name)
+
+            if [[ "$PROJECT" == *"revision="* ]]
+            then
+                BRANCH=$(GetValueOfTag "$PROJECT" revision)
+            else
+                BRANCH=$(GetValueOfTag "$REMOTE" revision | cut -d '/' -f 3)
+            fi
+
+            git -C "$DESTINATION" pull "$URL/$REPOSITORY" "$BRANCH"
         fi
     else
         clone_project "$1"
@@ -125,6 +138,10 @@ function gmt()
             elif [[ "$line" == *"<project"* ]]; then
 
                 echo "$line" >> .gmt/projects
+
+            elif [[ "$line" == *"<default"* ]]; then
+
+                echo "$line" >> .gmt/default_remote
 
             fi
         done < <(SimplifyFile ".gmt/$FILE")
@@ -185,7 +202,12 @@ function gmt()
         do
             while read -r remote || [[ -n $remote ]]
             do
-                NAME=$(GetValueOfTag "$remote" name)
+                if [ -z "$(GetValueOfTag "$project" remote)" ]
+                then
+                    NAME=$(GetValueOfTag "$(cat .gmt/default_remote)" remote)
+                else
+                    NAME=$(GetValueOfTag "$remote" name)
+                fi
 
                 if [[ "$project" == *"remote=\"$NAME\""* ]]
                 then
@@ -208,8 +230,9 @@ function gmt()
         while read -r project || [[ -n $project ]]
         do
             check_project "$project"
-            echo
         done < .gmt/projects
+
+        echo
 
     elif [[ "$1" == "reset" ]]; then
 
