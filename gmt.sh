@@ -88,7 +88,7 @@ function sync_project()
     PROJECT=$1
     REMOTE=$2
 
-    FOLDER=$(GetValueOfTag "$PROJECT" path)
+    DESTINATION=$(GetValueOfTag "$PROJECT" path)
 
     if [ -d "$DESTINATION" ]
     then
@@ -98,11 +98,8 @@ function sync_project()
         then
             TAG=$(GetValueOfTag "$REMOTE" revision | cut -d '/' -f 3)
 
-            if [[ $(git -C "$DESTINATION" describe --tags) != "$TAG" ]]
-            then
-                git -C "$DESTINATION" pull
-                git -C "$DESTINATION" checkout "$TAG"
-            fi
+            git -C "$DESTINATION" pull
+            git -C "$DESTINATION" checkout "$TAG"
         else
             URL=$(GetValueOfTag "$REMOTE" fetch)
             REPOSITORY=$(GetValueOfTag "$PROJECT" name)
