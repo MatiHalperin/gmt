@@ -2,7 +2,7 @@
 
 function GetValueOfTag()
 {
-    PARTS=$(echo "$1" | tr " " "\n")
+    PARTS=$(echo "$1" | tr ' ' '\n')
     
     for VALUE in $PARTS
     do
@@ -20,11 +20,11 @@ function SimplifyFile()
     do
         if [[ "$line" == *"<"* && "$line" == *"/>"* || "$line" == *"<"* && "$line" == *">"* ]]; then
 
-            SIMPLIFIEDFILE+="$line\n"
+            SIMPLIFIEDFILE+="$line\\n"
 
         elif [[ "$line" == *"/>"* ]]; then
 
-            SIMPLIFIEDFILE+=" $line\n"
+            SIMPLIFIEDFILE+=" $line\\n"
 
         else
 
@@ -33,7 +33,7 @@ function SimplifyFile()
         fi
     done < "$1"
 
-    echo -e "$SIMPLIFIEDFILE" | tr -s " " | sed 's/<!--/\x0<!--/g;s/-->/-->\x0/g' | grep -zv '^<!--' | tr -d '\0' | grep -v "^\s*$"
+    echo -e "$SIMPLIFIEDFILE" | tr -s " " | sed 's/<!--/\x0<!--/g;s/-->/-->\x0/g' | grep -zv '^<!--' | tr -d '\0' | grep -v "^\\s*$"
 }
 
 function clone_project()
@@ -231,10 +231,29 @@ function gmt()
 
         echo
 
-    elif [[ "$1" == "reset" ]]; then
+    elif [[ "$1" == "reset" ]]
+    then
+        if [[ "$2" != "" ]]
+        then
+            if [[ "$2" == "." ]]
+            then
+                URL=$(git ls-remote --get-url)
+                BRANCH=$(git symbolic-ref -q --short HEAD || git describe --tags --exact-match)
 
-        rm -rf .gmt/
+                git reset --quiet --hard
+                git clean --quiet -f -d -x
+                git pull --quiet "$URL" "$BRANCH"
+            else
+                URL=$(git -C "$2" ls-remote --get-url)
+                BRANCH=$(git -C "$2" symbolic-ref -q --short HEAD || git -C "$2" describe --tags --exact-match)
 
+                git -C "$2" reset --quiet --hard
+                git -C "$2" clean --quiet -f -d -x
+                git -C "$2" pull --quiet "$URL" "$BRANCH"
+            fi
+        else
+            rm -rf .gmt/
+        fi
     fi
 
     for ARGUMENT in "$@"
